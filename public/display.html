@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>CallBox - Display (Overlay Queue)</title>
+<link rel="stylesheet" href="style_v2.css" />
+<style>
+  html,body { height:100%; margin:0; background: transparent; }
+  .grid { display:grid; width:100vw; height:100vh; grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr; }
+  .cell { position:relative; overflow:hidden; }
+  #patient-cell { display:flex; align-items:flex-start; justify-content:flex-start; padding:24px; }
+  .call-card { background: rgba(255,255,255,0.95); border-radius:10px; padding:14px; box-shadow:0 8px 20px rgba(0,0,0,0.18); min-width:320px; }
+  .call-list { display:flex; flex-direction:column; gap:6px; width:100%; }
+  .patient-line { display:flex; justify-content:space-between; align-items:center; padding:4px 6px; }
+  .name-left { text-align:left; flex:1; }
+  .box-right { text-align:right; margin-left:12px; white-space:nowrap; }
+  .last-patient .name-left { font-size:36px; font-weight:800; }
+  .last-patient .box-right { font-size:36px; font-weight:800; }
+  .recent-patient .name-left { font-size:24px; font-weight:700; }
+  .recent-patient .box-right { font-size:24px; font-weight:700; }
+  .other-patient .name-left { font-size:20px; }
+  .other-patient .box-right { font-size:20px; }
+
+  /* Fullscreen overlay (uses existing .call-card look) */
+  #callOverlay { display:none; position:fixed; inset:0; z-index:9999; align-items:center; justify-content:center; background: rgba(0,0,0,0.25); }
+  #callOverlay .call-card { min-width: 40%; max-width: 900px; text-align:center; padding:30px; }
+  #overlayName { font-size:42px; font-weight:800; }
+  #overlayBox { font-size:42px; font-weight:800; margin-top:8px; }
+</style>
+</head>
+<body>
+  <div class="grid">
+    <div id="patient-cell" class="cell">
+      <div id="callContainer" class="call-card" aria-live="polite" role="status">
+        <div id="callList" class="call-list"></div>
+      </div>
+    </div>
+    <div id="ad1" class="cell"></div>
+    <div id="ad2" class="cell"></div>
+    <div id="ad3" class="cell"></div>
+  </div>
+
+  <!-- Fullscreen overlay shown on call (queued) -->
+  <div id="callOverlay">
+    <div class="call-card">
+      <div id="overlayName">Nombre A.</div>
+      <div id="overlayBox">Box 5</div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  const DISPLAY_MS = 4000; // using 4 seconds per your later spec (was 3s initially)
+  const MAX_HISTORY = 5;
+  const port = location.port || "3000";
+  const protocol = location.protocol === "https:" ? "wss:" : "ws:";
+  const wsUrl = protocol + "//" + location.hostname + ":" + port;
+  let ws;
+  let calls = [];
+  const overlayQueue = [];
+  let overlayBusy = false;
+
+  // audio sources: prefer mp3, fallback to wav if mp3 not available
+  const AUDIO_MP3 = "sound/Call.mp3";
+  const AUDIO_WAV = "sound/Call.wav";
+
+  const PLACE1 = "Esperando llamado...";
+  const PLACE2 = "No hay paciente activo";
+
+  function connect(){
+    try {
+      ws = new WebSocket(wsUrl);
+    } catch(e){
+      console.error("WS init failed", e);
+      return;
+    }
+    ws.onopen = () => console.log("Display conectado a " + wsUrl);
+    ws.onmessage = (ev) => {
+      try {
+        const msg = JSON.parse(ev.data);
+        if (msg && typeof msg === 'object' && 'type' in msg) {
+          if (msg.type === "PATIENT_CALL" && msg.data) {
+            handlePayload(msg.data);
+          } else {
+            // ignore other message types like HELLO
+            return;
+          }
+        } else {
+          // raw payload
+          handlePayload(msg);
+        }
+      } catch(e) {
+        console.error("WS message parse error", e);
+      }
+    };
+    ws.onclose = () => setTimeout(connect, 1500);
+    ws.onerror = (e) => { console.error("WS error", e); ws.close(); };
+  }
+
+  function handlePayload(payload){
+    if (!payload) return;
+    const paciente = payload.paciente || payload || {};
+    const nombreCompleto = paciente.nombreCompleto || paciente.nombre || paciente.name || "";
+    const boxRaw = payload.boxId || payload.box || payload.boxIdRaw || "";
+    const boxNumber = extractBoxNumber(boxRaw);
+
+    const nameShort = formatShortName(nombreCompleto);
+    const entry = { name: nameShort, box: boxNumber, at: payload.at || new Date().toISOString() };
+
+    // push to front and dedupe
+    calls.unshift(entry);
+    calls = calls.filter((v,i,self) => i === self.findIndex(t => t.name===v.name && t.box===v.box));
+    if (calls.length > MAX_HISTORY) calls = calls.slice(0, MAX_HISTORY);
+    renderHistory();
+
+    // enqueue overlay display (show fullscreen + sound)
+    enqueueOverlay(entry);
+  }
+
+  function enqueueOverlay(entry){
+    overlayQueue.push(entry);
+    if (!overlayBusy) showNextOverlay();
+  }
+
+  function showNextOverlay(){
+    if (overlayQueue.length === 0) { overlayBusy = false; return; }
+    overlayBusy = true;
+    const entry = overlayQueue.shift();
+    const overlay = document.getElementById("callOverlay");
+    const nameEl = document.getElementById("overlayName");
+    const boxEl = document.getElementById("overlayBox");
+    nameEl.textContent = entry.name || "";
+    boxEl.textContent = entry.box ? ("Box " + entry.box) : "";
+
+    // show overlay
+    overlay.style.display = "flex";
+
+    // try mp3 then wav fallback
+    const audio = new Audio();
+    audio.src = AUDIO_MP3;
+    audio.play().catch(()=>{
+      audio.src = AUDIO_WAV;
+      audio.play().catch(()=>{});
+    });
+
+    // after DISPLAY_MS hide and show next
+    setTimeout(()=>{
+      overlay.style.display = "none";
+      overlayBusy = false;
+      // next in queue
+      if (overlayQueue.length > 0) {
+        // small delay to avoid overlap
+        setTimeout(showNextOverlay, 200);
+      }
+    }, DISPLAY_MS);
+  }
+
+  function extractBoxNumber(boxId){
+    if (!boxId) return "";
+    const m = String(boxId).match(/(\d+)/);
+    return m ? m[0] : String(boxId);
+  }
+
+  function formatShortName(fullName){
+    if (!fullName) return "";
+    const parts = String(fullName).trim().split(/\s+/);
+    const first = parts[0] || "";
+    let initial = "";
+    if (parts.length > 1){
+      const last = parts[parts.length-1];
+      if (last && last.length>0){
+        initial = last.charAt(0).toUpperCase() + ".";
+      }
+    }
+    return initial ? (first + " " + initial) : first;
+  }
+
+  function renderHistory(){
+    const listEl = document.getElementById("callList");
+    if (!calls.length){
+      listEl.innerHTML = "";
+      const p1 = document.createElement("div");
+      p1.className = "patient-line last-patient";
+      p1.innerHTML = '<div class="name-left">'+PLACE1+'</div><div class="box-right"></div>';
+      const p2 = document.createElement("div");
+      p2.className = "patient-line other-patient";
+      p2.innerHTML = '<div class="name-left">'+PLACE2+'</div><div class="box-right"></div>';
+      listEl.appendChild(p1);
+      listEl.appendChild(p2);
+      return;
+    }
+    listEl.innerHTML = "";
+    calls.forEach((entry, idx) => {
+      const line = document.createElement("div");
+      let cls = "patient-line other-patient";
+      if (idx === 0) cls = "patient-line last-patient";
+      else if (idx >= 1 && idx <= 4) cls = "patient-line recent-patient";
+      line.className = cls;
+      const left = document.createElement("div");
+      left.className = "name-left";
+      left.textContent = entry.name;
+      const right = document.createElement("div");
+      right.className = "box-right";
+      right.textContent = entry.box ? ("Box " + entry.box) : "";
+      line.appendChild(left);
+      line.appendChild(right);
+      listEl.appendChild(line);
+    });
+  }
+
+  // initialize
+  renderHistory();
+  connect();
+  window._callbox_display = { calls, enqueueOverlay, showNextOverlay };
+})();
+</script>
+</body>
+</html>

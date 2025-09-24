@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>CallBox — Intake</title>
+<link rel="stylesheet" href="style_intake.css">
+</head>
+<body>
+  <main class="centered">
+    <div class="card form-card">
+      <h2>Agregar paciente</h2>
+      <form id="intakeForm">
+        <label>Nombre completo
+          <input id="nombreCompleto" name="nombreCompleto" required placeholder="Ej: Juan Pérez">
+        </label>
+        <label>RUT
+          <input id="rut" name="rut" placeholder="12.345.678-9">
+        </label>
+        <label>Edad
+          <input id="edad" name="edad" type="number" min="0" placeholder="45">
+        </label>
+        <label>Tipo de atención
+          <input id="tipoAtencion" name="tipoAtencion" placeholder="Control">
+        </label>
+        <label>Hora
+          <input id="hora" name="hora" placeholder="09:30">
+        </label>
+<<<<<<< HEAD
+        
+=======
+>>>>>>> 6fe531c (corregido intake, permite subir nuevos pacientes, y crea lista que se refleja en todos los box, se permite ejecutar desde diferentes navegadores)
+
+        <div class="actions">
+          <button type="submit" class="primary">Enviar</button>
+          <button type="button" id="clearBtn" class="secondary">Limpiar</button>
+        </div>
+        <div id="status" class="status"></div>
+      </form>
+    </div>
+
+    <div class="help card">
+      <h4>Instrucciones</h4>
+      <ol>
+        <li>Rellena el formulario y presiona <strong>Enviar</strong>.</li>
+        <li>La pantalla principal (index.html) mostrará el paciente en tiempo real.</li>
+        <li>Si tienes el servidor con WebSocket (/api/intake), el formulario también enviará al servidor.</li>
+      </ol>
+    </div>
+  </main>
+
+<script src="intake.js"></script>
+</body>
+</html>

@@ -1,0 +1,118 @@
+:root {
+  --color-white: #fff;
+  --color-background: #c8e2e3;
+  --color-surface: #fffffd;
+  --color-text: #13343b;
+  --color-text-secondary: #626c71;
+  --color-primary: #21808d;
+  --color-primary-hover: #1d7480;
+  --color-primary-active: #1a6873;
+  --color-secondary: rgba(94,82,64,.12);
+  --color-secondary-hover: rgba(94,82,64,.2);
+  --color-border: rgba(94,82,64,.2);
+  --color-success: #21808d;
+  --color-warning: #a84b2f;
+  --color-card-border: rgba(94,82,64,.12);
+  --shadow-md: 0 4px 6px rgba(0,0,0,.05);
+  --shadow-lg: 0 10px 15px rgba(0,0,0,.06);
+  --radius-lg: 12px;
+  --radius-base: 8px;
+  --space-8: 8px;
+  --space-12: 12px;
+  --space-16: 16px;
+  --space-20: 20px;
+  --space-24: 24px;
+  --space-32: 32px;
+  --font-size-sm: 16px;
+  --font-size-base: 16px;
+  --font-size-lg: 16px;
+  --font-size-xl: 18px;
+  --font-size-3xl: 24px;
+}
+
+* { box-sizing: border-box; }
+body { margin:0; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background: var(--color-background); color: var(--color-text); }
+
+.container { max-width: 1600px; margin: 0 auto; padding: 0 var(--space-16); }
+
+.screen { min-height: 100vh; padding: var(--space-32) 0; }
+.hidden { display: none !important; }
+
+.header-section { text-align: center; margin-bottom: var(--space-32); }
+.header-section h1 { margin: 0 0 var(--space-12) 0; font-size: var(--font-size-3xl); }
+.subtitle, .current-date { color: var(--color-text-secondary); margin: 0; }
+.sync-hint { margin-top: 6px; font-size: var(--font-size-sm); color: var(--color-text-secondary); }
+
+.box-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-16); max-width:800px; margin:0 auto; }
+.box-btn { background: rgba(33,128,141,.08); border: 2px solid var(--color-primary); border-radius: var(--radius-lg); padding: var(--space-24); cursor:pointer; text-align:center; font-weight:600; font-size: var(--font-size-lg); color: var(--color-primary); transition: .25s; }
+.box-btn:hover { background: var(--color-primary); color: #fff; transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+.box-btn.selected { background: var(--color-primary); color:#fff; }
+
+.table-container { background: var(--color-surface); border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow-md); border:1px solid var(--color-card-border); margin-top: var(--space-16); }
+.patients-table { width:100%; border-collapse: collapse; font-size: var(--font-size-sm); }
+.patients-table th { background: rgba(33,128,141,.08); padding: var(--space-16) var(--space-12); text-align:left; border-bottom: 1px solid var(--color-border); }
+.patients-table td { padding: var(--space-12); border-bottom: 1px solid rgba(94,82,64,.12); }
+.patients-table tbody tr:hover { background: rgba(230,129,97,.08); }
+
+.status-badge { display:inline-flex; align-items:center; gap:6px; padding: 4px 10px; border-radius: 999px; font-weight: 600; font-size: 11px; border:1px solid transparent; }
+.status-badge.ready { color: var(--color-success); background: rgba(33,128,141,.15); border-color: rgba(33,128,141,.25); }
+.status-badge.notready { color: var(--color-warning); background: rgba(168,75,47,.15); border-color: rgba(168,75,47,.25); }
+.status-badge.called { color: #0b5; background: rgba(0,187,85,.15); border-color: rgba(0,187,85,.25); }
+
+.btn { display:inline-flex; align-items:center; justify-content:center; gap:8px; padding: 8px 14px; border-radius: var(--radius-base); font-size: var(--font-size-base); border: none; cursor:pointer; transition: .25s; }
+.btn--primary { background: var(--color-primary); color:#fff; }
+.btn--primary:hover { background: var(--color-primary-hover); }
+.btn--secondary { background: var(--color-secondary); color: var(--color-text); }
+.btn--secondary:hover { background: var(--color-secondary-hover); }
+.btn:disabled { opacity: .6; cursor: not-allowed; }
+
+.btn-call { composes: btn btn--primary; } /* note: purely visual; inlined classes in HTML */
+
+.modal { position: fixed; inset:0; z-index: 1000; display:flex; align-items:center; justify-content:center; }
+.modal-backdrop { position:absolute; inset:0; background: rgba(0,0,0,.5); }
+.modal-content { position:relative; z-index: 1001; background: var(--color-surface); border:1px solid var(--color-card-border); border-radius: var(--radius-lg); min-width: 380px; max-width: 90vw; box-shadow: var(--shadow-lg); overflow:hidden; }
+.modal-header { padding: var(--space-20) var(--space-20) 0; border-bottom: 1px solid rgba(94,82,64,.12); }
+.modal-header h3 { margin: 0 0 var(--space-16) 0; font-size: var(--font-size-xl); }
+.modal-body { padding: 0 var(--space-20) var(--space-16); }
+.modal-footer { padding: var(--space-16) var(--space-20) var(--space-20); border-top: 1px solid rgba(94,82,64,.12); display:flex; gap:12px; justify-content:flex-end; }
+
+.patient-details { background: rgba(34,197,94,.08); border:1px solid rgba(33,128,141,.25); border-radius: var(--radius-base); padding: var(--space-16); }
+.patient-detail-row { display:flex; justify-content:space-between; margin-bottom: var(--space-8); font-size: var(--font-size-base); }
+.patient-detail-row:last-child { margin-bottom: 0; }
+.patient-detail-label { font-weight: 700; }
+.patient-detail-value { color: var(--color-text-secondary); }
+
+.success-text { text-align:center; margin-bottom: var(--space-16); }
+.success-icon { text-align:center; font-size: 32px; color: #0b5; margin-bottom: var(--space-16); }
+
+@media (max-width: 768px) {
+  .patients-table { font-size: 11px; }
+  .modal-content { min-width: 320px; margin: var(--space-16); }
+  .box-grid { grid-template-columns: repeat(auto-fit, minmax(150px,1fr)); }
+}
+
+
+/* Callbox 2.2: acciones a la derecha y en una sola línea */
+.patients-table td:last-child { white-space: nowrap; }
+.btn-actions { display: flex; gap: 8px; justify-content: flex-end; align-items: center; flex-wrap: nowrap; }
+.patients-table { table-layout: auto; }
+
+/* CallBox 2.3: icono eliminar */
+.btn .icon-trash { font-weight:bold; font-size:14px; }
+
+/* CallBox 2.4: ajustar columnas al contenido (nowrap), excepto 'Nombre' que puede envolver */
+.patients-table { table-layout: auto; }
+.patients-table th, .patients-table td { white-space: nowrap; }
+.patients-table td:first-child, .patients-table th:first-child { white-space: normal; }
+/* Botonera a la derecha, en una línea */
+.patients-table td:last-child { white-space: nowrap; }
+.btn-actions { display:flex; gap:8px; justify-content:flex-end; align-items:center; flex-wrap:nowrap; }
+/* Iconos en botones */
+.btn .icon { font-weight: bold; font-size: 14px; }
+
+
+/* Call Box 2.7 demo — footer sizing fix */
+.site-footer{ margin-top:32px; padding:16px 0 32px; display:flex; justify-content:center; }
+.footer-inner{ text-align:center; opacity:.85; }
+.footer-logo{ max-width:180px; height:auto; display:block; margin:0 auto 6px auto; }
+.footer-copy small{ color: var(--color-text-secondary); font-size: 12px; letter-spacing:.2px; }

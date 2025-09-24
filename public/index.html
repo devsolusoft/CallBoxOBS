@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Llamado de Pacientes — v2.822</title>
+    <link rel="stylesheet" href="style_v2.css">
+</head>
+<body>
+    <!-- Pantalla de Selección de Box -->
+    <div id="box-selection" class="screen active">
+        <div class="container">
+            <div class="header-section">
+                <h1>Call Box - Sistema de Llamado de Pacientes</h1>
+                <p class="subtitle">Seleccione el box desde donde realizará la atención</p>
+            </div>
+            
+            <div class="box-grid" id="box-grid">
+                <!-- Boxes will be poblados por JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Pantalla Principal - Lista de Pacientes -->
+    <div id="patient-list" class="screen">
+        <div class="container">
+            <div class="header-section">
+                <div class="flex justify-between items-center mb-8">
+                    <div>
+                        <h1 id="box-title">Citas del Día</h1>
+                        <p class="current-date" id="current-date"></p>
+                        <p class="sync-hint" id="sync-hint" title="Los cambios se sincronizan en vivo entre pestañas/navegadores en la misma red.">Sincronización en vivo activa</p>
+                    </div>
+                    <button class="btn btn--secondary" id="change-box-btn">Cambiar Box</button>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table class="patients-table" id="patients-table">
+                    
+<thead>
+  <tr>
+    <th>Nombre</th>
+    <th>RUT</th>
+    <th>Edad</th>
+    <th>Hora</th>
+    <th>Tipo de Atención</th>
+    <th>Observaciones</th>
+    <th>Estado</th>
+    <th>Acción</th>
+  </tr>
+</thead>
+
+                    <tbody id="patients-tbody">
+                        <!-- Filas pobladas por JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Confirmación -->
+    <div id="confirmation-modal" class="modal hidden">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-title">Confirmar Llamado de Paciente</h3>
+            </div>
+            <div class="modal-body">
+                <p class="confirmation-text" id="confirmation-text">¿Está seguro que desea llamar a este paciente?</p>
+                <div class="patient-details" id="patient-details">
+                    <!-- Detalles del paciente -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn--secondary" id="cancel-btn">Cancelar</button>
+                <button class="btn btn--primary" id="confirm-btn">Confirmar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Éxito -->
+    <div id="success-modal" class="modal hidden">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="success-title">Acción realizada</h3>
+            </div>
+            <div class="modal-body">
+                <p class="success-text" id="success-text">El paciente ha sido llamado exitosamente.</p>
+                <div class="success-icon">✓</div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn--primary" id="success-ok-btn">Entendido</button>
+            </div>
+        </div>
+    </div>
+
+<<<<<<< HEAD
+    <script src="app_2_8.js"></script>
+=======
+    <script src="index.js"></script>
+>>>>>>> 6fe531c (corregido intake, permite subir nuevos pacientes, y crea lista que se refleja en todos los box, se permite ejecutar desde diferentes navegadores)
+
+    <footer class="site-footer">
+        <div class="footer-inner">
+            <img src="Logo-con-Texto-Blanco.png" alt="Summate" class="footer-logo">
+            <div class="footer-copy"><small> Call Box By Summate powered IA</small></div>
+        </div>
+    </footer>
+
+</body>
+</html>
