@@ -36,3 +36,34 @@ button{padding:10px 14px;border-radius:8px;border:none;cursor:pointer;font-weigh
 .pat-meta{font-size:13px;color:var(--muted)}
 .pat-box{background:rgba(255,255,255,0.04);padding:6px 10px;border-radius:8px;font-weight:700;color:#fff}
 .footer{margin-top:18px;text-align:center;color:var(--muted);font-size:13px}
+
+
+/* Centrado vertical/horizontal solo para intake */
+.centered.centered--single {
+  display: flex;               /* un contenedor flexible */
+  align-items: center;         /* centra vertical */
+  justify-content: center;     /* centra horizontal */
+  min-height: 100vh;           /* ocupa toda la ventana */
+  padding: 32px;               /* mantiene espacio interior */
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Ajusta la tarjeta del formulario para que no sea demasiado ancha */
+.centered.centered--single .form-card {
+  width: 100%;
+  max-width: 600px;    /* ancho máximo agradable en escritorio */
+  margin: 0 auto;
+}
+
+/* Responsivo: en pantallas pequeñas ocupará casi todo */
+@media (max-width: 640px) {
+  .centered.centered--single {
+    padding: 16px;
+  }
+  .centered.centered--single .form-card {
+    max-width: 100%;
+    border-radius: 10px;
+    padding: 16px;
+  }
+}

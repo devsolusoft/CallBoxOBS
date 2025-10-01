@@ -1,44 +1,10 @@
-<<<<<<< HEAD
-// server.js - simple express + ws server for testing
-=======
 // server.js
->>>>>>> 6fe531c (corregido intake, permite subir nuevos pacientes, y crea lista que se refleja en todos los box, se permite ejecutar desde diferentes navegadores)
 const express = require("express");
 const http = require("http");
 const WebSocket = require("ws");
 const path = require("path");
 
 const app = express();
-<<<<<<< HEAD
-app.use(express.json());
-app.use(express.static(path.join(__dirname, "public")));
-
-const server = http.createServer(app);
-const wss = new WebSocket.Server({ server });
-
-wss.on("connection", (ws, req) => {
-  console.log("WS cliente conectado:", req.socket.remoteAddress);
-  // enviar HELLO para probar que el display lo ignorará
-  ws.send(JSON.stringify({ type: "HELLO", msg: "connected" }));
-});
-
-function broadcast(obj) {
-  const payload = JSON.stringify(obj);
-  for (const client of wss.clients) {
-    if (client.readyState === WebSocket.OPEN) client.send(payload);
-  }
-}
-
-app.post("/api/broadcast", (req, res) => {
-  const body = req.body;
-  if (!body) return res.status(400).json({ ok: false, error: "No body" });
-  broadcast({ type: "PATIENT_CALL", data: body });
-  res.json({ ok: true });
-});
-
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Server listening http://localhost:${PORT}`));
-=======
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
@@ -118,4 +84,3 @@ const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`Servidor corriendo en http://localhost:${PORT}`);
 });
->>>>>>> 6fe531c (corregido intake, permite subir nuevos pacientes, y crea lista que se refleja en todos los box, se permite ejecutar desde diferentes navegadores)

@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Intake v2.96</title>
+  <link rel="stylesheet" href="intake2.css">
+</head>
+<body>
+<header class="app-header hero">
+  <h1>Intake <span class="tag">v2.96</span></h1>
+</header>
+<main class="container layout">
+  <section class="panel card">
+    <h2>Entrada</h2>
+    <div class="grid">
+      <div>
+        <label for="fecha">Fecha</label>
+        <input id="fecha" type="date"/>
+      </div>
+    </div>
+
+    <label for="raw">Pega aquí el texto de la agenda:</label>
+    <textarea id="raw" rows="6" placeholder="Ejemplo: 120737893 @0V\Q@ 29.08.2025 11:20 Por Atender TOMA MUEST 8991849-9 ALARCON SALINAS MARIA LUCY (M, 64) PACIENTE SIN AYUNA JOAYALA 900001"></textarea>
+
+    <div class="actions">
+      <button id="btnPreview" class="btn btn--primary">Previsualizar</button>
+      <button id="btnClear" class="btn">Limpiar</button>
+      <button id="btnSend" class="btn btn--success">Enviar</button>
+    </div>
+  </section>
+
+  <section class="panel card">
+    <h2>Previsualización</h2>
+    <div class="table-wrap">
+      <table id="tbl" class="list">
+        <thead>
+          <tr>
+            <th>Nombre</th>
+            <th>RUT</th>
+            <th>Edad</th>
+            <th>Hora</th>
+            <th>Tipo de Atención</th>
+            <th>Observaciones</th>
+            <th>Estado</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+    <div id="emptyHint" class="hint">Sin datos para mostrar.</div>
+  </section>
+</main>
+
+<footer class="foot"></footer>
+
+<!-- carga el intake.js existente para que el comportamiento de envío sea compatible -->
+<script src="intake.js"></script>
+
+<!-- script de parsing y bridge: intenta reutilizar funciones del intake.js si existen; si no, usa eventos/postMessage/fetch -->
+<script>
+(function(){
+  'use strict';
+
+  function parseRaw(raw, fechaVal) {
+    const lines = raw.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+    const patients = lines.map(line => {
+      const original = line;
+      // RUT (ej: 12345678-9)
+      const rutMatch = line.match(/\b\d{6,8}-[0-9kK]\b/);
+      const rut = rutMatch ? rutMatch[0] : '';
+
+      // Fecha (dd.mm.yyyy o dd/mm/yyyy)
+      const dateMatch = line.match(/\b\d{1,2}[./]\d{1,2}[./]\d{2,4}\b/);
+      const fecha = dateMatch ? dateMatch[0] : (fechaVal || '');
+
+      // Hora hh:mm
+      const timeMatch = line.match(/\b([01]?\d|2[0-3]):[0-5]\d\b/);
+      const hora = timeMatch ? timeMatch[0] : '';
+
+      // Estado (si aparece)
+      const estadoMatch = line.match(/\b(Por Atender|Atendido|En Espera|En Curso|Llamado)\b/i);
+      const estado = estadoMatch ? estadoMatch[0] : 'Por Atender';
+
+      // (Genero, edad)
+      const genderAgeMatch = line.match(/\(([MFmf])\s*,\s*(\d{1,3})\)|\(([MFmf])\s+(\d{1,3})\)/);
+      let edad = '';
+      if (genderAgeMatch) edad = (genderAgeMatch[2] || genderAgeMatch[4] || '').toString();
+      else {
+        // fallback: buscar un número razonable como edad (último número pequeño)
+        const ageFallback = line.match(/\b(\d{1,3})\b(?!.*\d)/);
+        if (ageFallback) {
+          const n = parseInt(ageFallback[1],10);
+          if (n>0 && n<130) edad = n.toString();
+        }
+      }
+
+      // Tipo de atención: intento heurístico entre hora y RUT
+      let tipo = '';
+      if (timeMatch && rutMatch && timeMatch.index!==undefined && rutMatch.index!==undefined) {
+        const start = timeMatch.index + timeMatch[0].length;
+        const end = rutMatch.index;
+        tipo = line.slice(start, end).replace(/[^\p{L}\p{N}\s]/gu,'').trim();
+      }
+      if (!tipo) {
+        // busca palabras en mayúsculas antes del RUT
+        const priorToRut = rutMatch ? line.slice(0, rutMatch.index) : line;
+        const caps = priorToRut.match(/\b[\p{Lu}]{2,}(?:[\s\p{Lu}]{0,})*\b/gu);
+        if (caps) tipo = caps.join(' ').trim();
+      }
+
+      // Nombre: intento extraer lo que viene después del RUT hasta el paréntesis o final
+      let nombre = '';
+      if (rutMatch) {
+        const after = line.slice(rutMatch.index + rutMatch[0].length).trim();
+        const paren = after.indexOf('(');
+        if (paren !== -1) nombre = after.slice(0, paren).trim();
+        else nombre = after.replace(/\b\d+\b/g,'').trim();
+      } else {
+        // fallback: secuencia de palabras en mayúsculas seguida de paréntesis
+        const m = line.match(/([A-ZÁÉÍÓÚÑ\s]{3,})\s*\(/);
+        if (m) nombre = m[1].trim();
+      }
+
+      // Observaciones: texto después del paréntesis de cierre
+      let observaciones = '';
+      const closeParen = line.indexOf(')');
+      if (closeParen !== -1) observaciones = line.slice(closeParen+1).trim();
+      else if (rutMatch) {
+        const after = line.slice(rutMatch.index + rutMatch[0].length).trim();
+        observaciones = after.replace(nombre, '').trim();
+      }
+
+      // limpieza final
+      nombre = nombre.replace(/\s{2,}/g,' ').trim();
+      tipo = tipo.replace(/\s{2,}/g,' ').trim();
+      observaciones = observaciones.replace(/\s{2,}/g,' ').trim();
+
+      return {
+        nombre: nombre || 'NOMBRE NO DETECTADO',
+        rut,
+        edad,
+        hora,
+        tipo,
+        observaciones,
+        estado,
+        fecha: fecha,
+        raw: original
+      };
+    });
+    return patients;
+  }
+
+  function showPreview(patients) {
+    const tbody = document.getElementById('tbody');
+    tbody.innerHTML = '';
+    if (!patients.length) {
+      document.getElementById('emptyHint').style.display = 'block';
+      return;
+    } else document.getElementById('emptyHint').style.display = 'none';
+
+    patients.forEach(p => {
+      const tr = document.createElement('tr');
+      const cells = [p.nombre, p.rut, p.edad, p.hora, p.tipo, p.observaciones, p.estado];
+      cells.forEach(text => {
+        const td = document.createElement('td');
+        td.textContent = text || '';
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+  }
+
+  // intenta múltiples vías para enviar los pacientes al sistema existente
+  function tryEmitPatients(patients) {
+    const candidateFns = ['sendPatients','submitPatients','addPatients','addPatient','submitPatient','savePatient','intakeSend','intake_add','intakeAddPatients'];
+    for (const name of candidateFns) {
+      const fn = window[name] || (window.parent && window.parent[name]);
+      if (typeof fn === 'function') {
+        try {
+          fn(patients);
+          return Promise.resolve({ok:true, method:'function:'+name});
+        } catch(e) {
+          console.error('Error calling',name,e);
+        }
+      }
+    }
+
+    try {
+      // emitir CustomEvent (intake:patients)
+      document.dispatchEvent(new CustomEvent('intake:patients', {detail:patients}));
+      // y postMessage al parent si aplica
+      if (window.parent && window.parent !== window && window.parent.postMessage) {
+        window.parent.postMessage({type:'intake:patients', patients}, '*');
+      }
+      return Promise.resolve({ok:true, method:'customEvent'});
+    } catch(e) {
+      console.error('customEvent failed', e);
+    }
+
+    // último recurso: POST a /api/patients (puede o no existir en tu proyecto)
+    return fetch('/api/patients', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(patients)
+    }).then(res => ({ok: res.ok, method: 'fetch', status: res.status}))
+      .catch(err => ({ok:false, method:'fetch', error: err.message}));
+  }
+
+  function createStatusElement() {
+    let s = document.getElementById('status');
+    if (!s) {
+      s = document.createElement('div'); s.id='status'; s.style.marginTop='8px';
+      const panel = document.querySelector('.panel.card');
+      panel.appendChild(s);
+    }
+    return s;
+  }
+
+  // eventos UI
+  document.getElementById('btnPreview').addEventListener('click', ()=>{
+    const raw = document.getElementById('raw').value;
+    const fecha = document.getElementById('fecha').value;
+    const patients = parseRaw(raw, fecha);
+    showPreview(patients);
+    window.__intake2_lastPatients = patients;
+  });
+
+  document.getElementById('btnClear').addEventListener('click', ()=>{
+    document.getElementById('raw').value = '';
+    document.getElementById('tbody').innerHTML = '';
+    document.getElementById('emptyHint').style.display = 'block';
+    window.__intake2_lastPatients = [];
+    const s = document.getElementById('status'); if (s) s.textContent='';
+  });
+
+  document.getElementById('btnSend').addEventListener('click', async ()=>{
+    const patients = window.__intake2_lastPatients && window.__intake2_lastPatients.length ? window.__intake2_lastPatients : parseRaw(document.getElementById('raw').value, document.getElementById('fecha').value);
+    if (!patients || !patients.length) return alert('No hay pacientes para enviar. Previsualiza primero.');
+
+    const statusEl = createStatusElement(); statusEl.textContent = 'Enviando...';
+    const res = await tryEmitPatients(patients);
+    if (res && res.ok) {
+      statusEl.textContent = 'Enviado correctamente (' + (res.method || '') + ')';
+    } else {
+      statusEl.textContent = 'No fue posible enviar automáticamente. Método: ' + (res.method || 'N/A');
+      // ofrecer descarga JSON como fallback
+      const blob = new Blob([JSON.stringify(patients,null,2)], {type:'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = 'patients.json'; a.textContent = 'Descargar JSON';
+      statusEl.appendChild(document.createTextNode(' '));
+      statusEl.appendChild(a);
+    }
+  });
+
+  // auto previsualizar al pegar
+  document.getElementById('raw').addEventListener('paste', ()=>{
+    setTimeout(()=>document.getElementById('btnPreview').click(), 120);
+  });
+
+})();
+</script>
+
+<footer class="site-footer">
+  <div class="footer-inner">
+    <img src="Logo-con-Texto-Blanco.png" alt="Summate" class="footer-logo">
+    <div class="footer-copy"><small> Intake by Summate powered IA</small></div>
+  </div>
+</footer>
+</body>
+</html>

@@ -90,6 +90,10 @@ let currentBox = null;
 let currentPatient = null;
 let currentAction = "call"; // "call" | "recall"
 
+function getNombrePaciente(p) {
+  return p.nombreCompleto || p.nombre || "(Sin nombre)";
+}
+
 /** Canal para sincronización en vivo entre pestañas/navegadores (mismo origen) */
 const channel = ("BroadcastChannel" in window) ? new BroadcastChannel("llamador-pacientes-v2") : null;
 
@@ -153,21 +157,27 @@ function __intake_readToday(){
   }catch{ return null; }
 }
 function __intake_map(item, idx){
-  // Mapeo al esquema que usa Callbox 2.2
   return {
-    id: 100000 + idx,                  // alto para no chocar con tus IDs mock
-    nombreCompleto: item.nombre || "",
+    id: item.id || (100000 + idx),
+    // Mantener SIEMPRE el nombreCompleto original
+    nombreCompleto: (item.nombreCompleto !== undefined ? item.nombreCompleto : item.nombre) || "",
+    // Nombre como alias, nunca al revés
+    nombre: item.nombre || item.nombreCompleto || "",
     rut: item.rut || "",
-    horaCita: item.hora || "",
-    estado: "por atender",             // Intake trae "Por atender" → normalizamos en minúsculas
+    // Mantener compatibilidad hora/horaCita
+    hora: item.hora || item.horaCita || "",
+    horaCita: item.horaCita || item.hora || "",
+    estado: item.estado || "por atender",
     tipoAtencion: item.tipoAtencion || "Toma de Muestra(s)",
-    sexo: "",
+    sexo: item.sexo || "",
     edad: item.edad ? Number(item.edad) : "",
-    observacion: item.observaciones || "",
-    callCount: 0,
-    lastCalledAt: null
+    observacion: item.observaciones || item.observacion || "",
+    callCount: item.callCount || 0,
+    lastCalledAt: item.lastCalledAt || null
   };
 }
+
+
 function __intake_baseOrMocks(){
   // Prefer server-provided pacientes when available
   if (Array.isArray(__serverPacientes) && __serverPacientes.length) {
@@ -376,7 +386,7 @@ function renderPatientTable(){
     actions.appendChild(btnDelete);
 
     tr.innerHTML = `
-      <td><strong>${paciente.nombreCompleto}</strong></td>
+      <td><strong>${getNombrePaciente(paciente)}</strong></td>
       <td>${paciente.rut || ""}</td>
       <td>${(paciente.edad ?? "")}</td>
       <td>${paciente.horaCita || ""}</td>
@@ -403,7 +413,7 @@ function openConfirmationModal(patientId, action = "call") {
     const count = currentPatient.callCount || 0;
     const last = currentPatient.lastCalledAt ? formatDateTime(currentPatient.lastCalledAt) : "—";
     el.innerHTML = `
-      <div class="patient-detail-row"><span class="patient-detail-label">Nombre:</span><span class="patient-detail-value">${currentPatient.nombreCompleto}</span></div>
+      <div class="patient-detail-row"><span class="patient-detail-label">Nombre:</span><span class="patient-detail-value">${getNombrePaciente(currentPatient)}</span></div>
       <div class="patient-detail-row"><span class="patient-detail-label">RUT:</span><span class="patient-detail-value">${currentPatient.rut}</span></div>
       <div class="patient-detail-row"><span class="patient-detail-label">Hora de Cita:</span><span class="patient-detail-value">${currentPatient.horaCita}</span></div>
       <div class="patient-detail-row"><span class="patient-detail-label">Veces llamado:</span><span class="patient-detail-value">${count}</span></div>
@@ -439,7 +449,8 @@ function confirmPatientCall22(){
     ...prev,
     estado: "atendido",
     callCount: newCount,
-    lastCalledAt: nowIso
+    lastCalledAt: nowIso,
+    nombreCompleto: getNombrePaciente(prev)   // ✅ aseguramos nombre
   };
 
   saveState(currentBox.id, state);
@@ -576,4 +587,5 @@ function hideModal(modal) {
   modal.classList.add("hidden");
 }
 
-/* confirm override removed in v2.8: handled by confirmPatientCallGuarded -> confirmPatientCall22 */
+
+
