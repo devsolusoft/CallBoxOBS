@@ -53,7 +53,7 @@
 (function(){
   const DISPLAY_MS = 4000; // using 4 seconds per your later spec (was 3s initially)
   const MAX_HISTORY = 5;
-  const port = location.port || "3000";
+
   const protocol = location.protocol === "https:" ? "wss:" : "ws:";
   const wsUrl = protocol + "//" + location.host; 
   const ws = new WebSocket(wsUrl);
