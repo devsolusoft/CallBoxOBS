@@ -56,8 +56,8 @@
 
   const protocol = location.protocol === "https:" ? "wss:" : "ws:";
   const wsUrl = protocol + "//" + location.host; 
-  const ws = new WebSocket(wsUrl);
-
+  
+  let ws; // usamos let para poder reconectar
   let calls = [];
   const overlayQueue = [];
   let overlayBusy = false;
@@ -69,7 +69,33 @@
   const PLACE1 = "Esperando llamado...";
   const PLACE2 = "No hay paciente activo";
 
-  b
+  function connect(){
+    try {
+      ws = new WebSocket(wsUrl);
+    } catch(e){
+      console.error("WS init failed", e);
+      return;
+    }
+    ws.onopen = () => console.log("Display conectado a " + wsUrl);
+    ws.onmessage = (ev) => {
+      try {
+        const msg = JSON.parse(ev.data);
+        if (msg && typeof msg === 'object' && 'type' in msg) {
+          if (msg.type === "PATIENT_CALL" && msg.data) {
+            handlePayload(msg.data);
+          }
+        } else {
+          handlePayload(msg);
+        }
+      } catch(e) {
+        console.error("WS message parse error", e);
+      }
+    };
+    ws.onclose = () => setTimeout(connect, 1500);
+    ws.onerror = (e) => { console.error("WS error", e); ws.close(); };
+  }
+
+
 
   function handlePayload(payload){
     if (!payload) return;
@@ -184,7 +210,7 @@
 
   // initialize
   renderHistory();
-  connect();
+  connect();  // ahora sí existe
   window._callbox_display = { calls, enqueueOverlay, showNextOverlay };
 })();
 </script>
