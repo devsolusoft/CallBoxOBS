@@ -99,38 +99,25 @@ const channel = ("BroadcastChannel" in window) ? new BroadcastChannel("llamador-
 
 /** Utilidades de persistencia (TTL 14 días) */
 const TTL_DAYS = 14;
-function storageKey(boxId) {
+function storageKeyGlobal() {
   const today = new Date();
   const y = today.getFullYear();
   const m = String(today.getMonth() + 1).padStart(2, "0");
   const d = String(today.getDate()).padStart(2, "0");
-  // Scope por día y Box
-  return `llamador:box:${boxId}:date:${y}-${m}-${d}`;
+  return `llamador:pacientes:date:${y}-${m}-${d}`;
 }
-function loadState(boxId) {
+function loadGlobalState() {
   try {
-    const raw = localStorage.getItem(storageKey(boxId));
-    if (!raw) return null;
-    const data = JSON.parse(raw);
-    // TTL: si es más viejo que 14 días, limpiar
-    if (!data.savedAt || Date.now() - data.savedAt > TTL_DAYS * 24 * 60 * 60 * 1000) {
-      localStorage.removeItem(storageKey(boxId));
-      return null;
-    }
-    return data;
-  } catch (e) {
-    console.error("Error al cargar estado:", e);
-    return null;
-  }
+    const raw = localStorage.getItem(storageKeyGlobal());
+    return raw ? JSON.parse(raw) : null;
+  } catch(e) { return null; }
 }
-function saveState(boxId, pacientes) {
+function saveGlobalState(pacientes) {
   try {
-    const payload = { pacientes, savedAt: Date.now(), version: 2 };
-    localStorage.setItem(storageKey(boxId), JSON.stringify(payload));
-  } catch (e) {
-    console.error("Error al guardar estado:", e);
-  }
+    localStorage.setItem(storageKeyGlobal(), JSON.stringify({ pacientes, savedAt: Date.now() }));
+  } catch(e){}
 }
+
 function purgeOldState() {
   try {
     const now = Date.now();
@@ -204,14 +191,23 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
   // BroadcastChannel sync
-  if (channel) {
-    channel.onmessage = (ev) => {
-      if (!currentBox) return;
-      if (ev?.data?.type === "STATE_UPDATED" && ev.data.boxId === currentBox.id) {
-        renderPatientTable();
-      }
-    };
-  }
+  // BroadcastChannel sync
+if (channel) {
+  channel.onmessage = (ev) => {
+    // --- Estado global ---
+    if (ev?.data?.type === "STATE_UPDATED_GLOBAL") {
+      renderPatientTable(); // refresca toda la tabla con estado global
+      return;
+    }
+
+    // --- Estado por box antiguo (para compatibilidad) ---
+    if (!currentBox) return;
+    if (ev?.data?.type === "STATE_UPDATED" && ev.data.boxId === currentBox.id) {
+      renderPatientTable();
+    }
+  };
+}
+
 });
 
 function initializeApp() {
@@ -290,7 +286,8 @@ function getPacientesActuales() {
   if (!currentBox) return base.map(p => ({ ...p }));
 
   // Merge con estado persistido por box (TTL 14 días)
-  const stored = loadState(currentBox.id);
+  const stored = loadGlobalState();
+
   if (!stored?.pacientes) return base.map(p => ({ ...p }));
 
   const map = new Map(stored.pacientes.map(p => [p.id, p]));
@@ -453,7 +450,9 @@ function confirmPatientCall22(){
     nombreCompleto: getNombrePaciente(prev)   // ✅ aseguramos nombre
   };
 
-  saveState(currentBox.id, state);
+saveGlobalState(state);
+if(channel) channel.postMessage({ type: "STATE_UPDATED_GLOBAL" });
+
   // Enviar evento al servidor para que displays remotos (OBS) actualicen la tarjeta
 try {
   const payload = {

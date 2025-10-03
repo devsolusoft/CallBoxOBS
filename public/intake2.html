@@ -172,16 +172,28 @@
   }
 
   // intenta múltiples vías para enviar los pacientes al sistema existente
-  function tryEmitPatients(patients) {
+  async function tryEmitPatients(patients) {
     const candidateFns = ['sendPatients','submitPatients','addPatients','addPatient','submitPatient','savePatient','intakeSend','intake_add','intakeAddPatients'];
     for (const name of candidateFns) {
       const fn = window[name] || (window.parent && window.parent[name]);
       if (typeof fn === 'function') {
         try {
-          fn(patients);
-          return Promise.resolve({ok:true, method:'function:'+name});
+          const result = fn(patients);
+          // si devuelve una Promise, la esperamos
+          if (result && typeof result.then === 'function') {
+            try {
+              const awaited = await result;
+              return {ok:true, method:'function:'+name, result: awaited};
+            } catch (err) {
+              console.error('Error en función async', name, err);
+              return {ok:false, method:'function:'+name, error: err && err.message ? err.message : err};
+            }
+          } else {
+            return {ok:true, method:'function:'+name, result};
+          }
         } catch(e) {
           console.error('Error calling',name,e);
+          return {ok:false, method:'function:'+name, error: e && e.message ? e.message : e};
         }
       }
     }
@@ -193,19 +205,24 @@
       if (window.parent && window.parent !== window && window.parent.postMessage) {
         window.parent.postMessage({type:'intake:patients', patients}, '*');
       }
-      return Promise.resolve({ok:true, method:'customEvent'});
+      return {ok:true, method:'customEvent'};
     } catch(e) {
       console.error('customEvent failed', e);
     }
 
     // último recurso: POST a /api/patients (puede o no existir en tu proyecto)
-    return fetch('/api/patients', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify(patients)
-    }).then(res => ({ok: res.ok, method: 'fetch', status: res.status}))
-      .catch(err => ({ok:false, method:'fetch', error: err.message}));
+    try {
+      const res = await fetch('/api/patients', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify(patients)
+      });
+      return {ok: res.ok, method: 'fetch', status: res.status};
+    } catch (err) {
+      return {ok:false, method:'fetch', error: err.message};
+    }
   }
+
 
   function createStatusElement() {
     let s = document.getElementById('status');
@@ -234,24 +251,119 @@
     const s = document.getElementById('status'); if (s) s.textContent='';
   });
 
+  // función helper: muestra un popup modal simple y devuelve una Promise que se resuelve al cerrar
+  function showSuccessPopup(message, opts = {}) {
+    return new Promise((resolve) => {
+      const overlay = document.createElement('div');
+      overlay.style.position = 'fixed';
+      overlay.style.inset = '0';
+      overlay.style.background = 'rgba(0,0,0,0.45)';
+      overlay.style.display = 'flex';
+      overlay.style.alignItems = 'center';
+      overlay.style.justifyContent = 'center';
+      overlay.style.zIndex = '9999';
+
+      const card = document.createElement('div');
+      card.style.maxWidth = '480px';
+      card.style.width = '90%';
+      card.style.background = '#fff';
+      card.style.padding = '18px';
+      card.style.borderRadius = '8px';
+      card.style.boxShadow = '0 6px 24px rgba(0,0,0,0.25)';
+      card.style.textAlign = 'center';
+      card.style.fontFamily = 'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial';
+
+      const title = document.createElement('div');
+      title.style.fontSize = '18px';
+      title.style.fontWeight = '700';
+      title.style.marginBottom = '8px';
+      title.style.color = '#000';
+      title.textContent = 'Envío exitoso';
+
+      const msg = document.createElement('div');
+      msg.style.marginBottom = '14px';
+      msg.style.fontSize = '14px';
+      msg.style.color = '#000';
+      msg.textContent = message || 'Los pacientes se enviaron correctamente.';
+
+      const btn = document.createElement('button');
+      btn.textContent = opts.okText || 'Aceptar';
+      btn.style.padding = '8px 14px';
+      btn.style.border = 'none';
+      btn.style.borderRadius = '6px';
+      btn.style.cursor = 'pointer';
+      btn.style.fontSize = '14px';
+      // estilo visual neutral — no forzamos colores del proyecto
+      btn.style.background = '#e6f7e6';
+      btn.style.boxShadow = '0 2px 6px rgba(0,0,0,0.08)';
+
+      btn.addEventListener('click', () => {
+        document.body.removeChild(overlay);
+        resolve('ok');
+      });
+
+      // cerrar al hacer click en overlay (fuera del card)
+      overlay.addEventListener('click', (ev) => {
+        if (ev.target === overlay) {
+          document.body.removeChild(overlay);
+          resolve('overlay');
+        }
+      });
+
+      card.appendChild(title);
+      card.appendChild(msg);
+      card.appendChild(btn);
+      overlay.appendChild(card);
+      document.body.appendChild(overlay);
+
+      // opcional: autocerrar después de X ms si opts.autoCloseMs está definido
+      if (opts.autoCloseMs && typeof opts.autoCloseMs === 'number') {
+        setTimeout(() => {
+          if (document.body.contains(overlay)) {
+            document.body.removeChild(overlay);
+            resolve('timeout');
+          }
+        }, opts.autoCloseMs);
+      }
+
+      // poner foco en el botón por accesibilidad
+      btn.focus();
+    });
+  }
+
   document.getElementById('btnSend').addEventListener('click', async ()=>{
     const patients = window.__intake2_lastPatients && window.__intake2_lastPatients.length ? window.__intake2_lastPatients : parseRaw(document.getElementById('raw').value, document.getElementById('fecha').value);
     if (!patients || !patients.length) return alert('No hay pacientes para enviar. Previsualiza primero.');
 
     const statusEl = createStatusElement(); statusEl.textContent = 'Enviando...';
-    const res = await tryEmitPatients(patients);
-    if (res && res.ok) {
-      statusEl.textContent = 'Enviado correctamente (' + (res.method || '') + ')';
-    } else {
-      statusEl.textContent = 'No fue posible enviar automáticamente. Método: ' + (res.method || 'N/A');
-      // ofrecer descarga JSON como fallback
-      const blob = new Blob([JSON.stringify(patients,null,2)], {type:'application/json'});
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a'); a.href = url; a.download = 'patients.json'; a.textContent = 'Descargar JSON';
-      statusEl.appendChild(document.createTextNode(' '));
-      statusEl.appendChild(a);
+    try {
+      const res = await tryEmitPatients(patients);
+      if (res && res.ok) {
+        statusEl.textContent = 'Enviado correctamente (' + (res.method || '') + ')';
+
+        // mostramos popup y limpiamos al mismo tiempo
+        // ejecutamos la limpieza (simular click en btnClear) para reutilizar tu lógica existente
+        const clearBtn = document.getElementById('btnClear');
+        if (clearBtn) clearBtn.click();
+
+        // mostrar popup; lo dejamos hasta que el usuario cierre (o autoClose si prefieres)
+        await showSuccessPopup('Pacientes enviados correctamente.', { autoCloseMs: 4000 });
+
+      } else {
+        statusEl.textContent = 'No fue posible enviar automáticamente. Método: ' + (res.method || 'N/A');
+        // ofrecer descarga JSON como fallback
+        const blob = new Blob([JSON.stringify(patients,null,2)], {type:'application/json'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url; a.download = 'patients.json'; a.textContent = 'Descargar JSON';
+        statusEl.appendChild(document.createTextNode(' '));
+        statusEl.appendChild(a);
+      }
+    } catch (err) {
+      console.error('Error en envío:', err);
+      statusEl.textContent = 'Error inesperado durante el envío.';
     }
   });
+
 
   // auto previsualizar al pegar
   document.getElementById('raw').addEventListener('paste', ()=>{
