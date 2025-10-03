@@ -55,9 +55,8 @@
   const MAX_HISTORY = 5;
   const port = location.port || "3000";
   const protocol = location.protocol === "https:" ? "wss:" : "ws:";
-  const wsUrl = protocol + "//" + location.host; 
-  const ws = new WebSocket(wsUrl);
-
+  const wsUrl = protocol + "//" + location.hostname + ":" + port;
+  let ws;
   let calls = [];
   const overlayQueue = [];
   let overlayBusy = false;
