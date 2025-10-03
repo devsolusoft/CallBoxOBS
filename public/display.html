@@ -69,35 +69,7 @@
   const PLACE1 = "Esperando llamado...";
   const PLACE2 = "No hay paciente activo";
 
-  function connect(){
-    try {
-      ws = new WebSocket(wsUrl);
-    } catch(e){
-      console.error("WS init failed", e);
-      return;
-    }
-    ws.onopen = () => console.log("Display conectado a " + wsUrl);
-    ws.onmessage = (ev) => {
-      try {
-        const msg = JSON.parse(ev.data);
-        if (msg && typeof msg === 'object' && 'type' in msg) {
-          if (msg.type === "PATIENT_CALL" && msg.data) {
-            handlePayload(msg.data);
-          } else {
-            // ignore other message types like HELLO
-            return;
-          }
-        } else {
-          // raw payload
-          handlePayload(msg);
-        }
-      } catch(e) {
-        console.error("WS message parse error", e);
-      }
-    };
-    ws.onclose = () => setTimeout(connect, 1500);
-    ws.onerror = (e) => { console.error("WS error", e); ws.close(); };
-  }
+  b
 
   function handlePayload(payload){
     if (!payload) return;
