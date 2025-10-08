@@ -1,10 +1,4 @@
-// v2: agrega "Volver a llamar" + sincronización básica entre usuarios (BroadcastChannel + localStorage con TTL 14 días)
 
-/** Datos base (mock) */
-/* --- Integración: pushToServer --- 
-   Envía el evento confirmado al servidor local para que displays remotos (OBS) se actualicen.
-   No rompe la lógica existente si el servidor no está presente (fail-safe).
-*/
 function pushToServer(payload) {
   try {
     const url = (location && location.origin ? location.origin : "") + "/api/broadcast";
@@ -38,7 +32,7 @@ const pacientesBase = [
   { id: 10, nombreCompleto: "Manuel Ignacio Contreras Ramírez", rut: "10.987.654-6", horaCita: "13:30", estado: "Listo", tipoAtencion: "Control Hipertensión", sexo: "Masculino", edad: 58 }
 ];
 
-/** === Server synchronization (WebSocket + polling) === */
+/* WebSocket + polling) */
 let __serverPacientes = null;
 let __callbox_ws = null;
 
@@ -62,7 +56,6 @@ function initServerWebSocket() {
       try {
         const msg = JSON.parse(ev.data);
         if (msg && msg.type === 'NEW_PATIENT') {
-          // immediate sync on new patient
           syncServerPacientes();
         }
         if (msg && msg.type === 'PACIENTES_CLEARED') {
@@ -77,8 +70,6 @@ function initServerWebSocket() {
   } catch(e){ console.warn('WS init failed', e); }
 }
 
-// Prefer server list when available
-// Injected behavior: __intake_baseOrMocks will use __serverPacientes if non-empty
 
 setInterval(syncServerPacientes, 5000);
 window.addEventListener('load', ()=>{ initServerWebSocket(); syncServerPacientes(); });
@@ -134,7 +125,6 @@ function purgeOldState() {
   } catch (e) {}
 }
 
-/** === Bridge Intake (localStorage) — integración mínima, sin backend === */
 function __intake_readToday(){
   try{
     const t = new Date();
@@ -166,7 +156,6 @@ function __intake_map(item, idx){
 
 
 function __intake_baseOrMocks(){
-  // Prefer server-provided pacientes when available
   if (Array.isArray(__serverPacientes) && __serverPacientes.length) {
     return __serverPacientes.map(__intake_map);
   }
@@ -174,16 +163,15 @@ function __intake_baseOrMocks(){
   if (batch && Array.isArray(batch.items) && batch.items.length) {
     return batch.items.map(__intake_map);
   }
-  // Fallback: tus pacientes base actuales
+  // pacientes base actuales
   return pacientesBase.map(p => ({ ...p, callCount: p.callCount || 0 }));
 }
 /** ===================================================================== */
 
-/** Inicialización */
+/** Inicialzacion */
 document.addEventListener("DOMContentLoaded", () => {
   purgeOldState();
   initializeApp();
-  // storage sync cross-tab fallback
   window.addEventListener("storage", (e) => {
     if (!currentBox) return;
     if (e.key === storageKey(currentBox.id)) {
@@ -191,7 +179,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
   // BroadcastChannel sync
-  // BroadcastChannel sync
+
 if (channel) {
   channel.onmessage = (ev) => {
     // --- Estado global ---
@@ -200,7 +188,7 @@ if (channel) {
       return;
     }
 
-    // --- Estado por box antiguo (para compatibilidad) ---
+    // --- Estado por box antiguo ---
     if (!currentBox) return;
     if (ev?.data?.type === "STATE_UPDATED" && ev.data.boxId === currentBox.id) {
       renderPatientTable();
@@ -280,7 +268,6 @@ function setCurrentDate() {
 
 /** Fusiona estado persistido con el base */
 function getPacientesActuales() {
-  // Base desde Intake (si hay lote hoy) o desde los mocks
   const base = __intake_baseOrMocks();
 
   if (!currentBox) return base.map(p => ({ ...p }));
@@ -297,13 +284,10 @@ function getPacientesActuales() {
   });
 }
 
-/** === Callbox 2.2 customizations ===
- * Estados: "Por atender" | "atendido"
- * Acciones: "llamar" | "volver a llamar" | "eliminar"
- */
+/* Estados: "Por atender" | "atendido"
+ * Acciones: "llamar" | "volver a llamar" | "eliminar" */
 function normalizePaciente(p) {
   const estadoBase = (p.estado && typeof p.estado === "string") ? p.estado.toLowerCase() : "por atender";
-  // map v2 -> v2.2
   let estado = "por atender";
   if (estadoBase === "llamado" || estadoBase === "atendido") estado = "atendido";
   return {
@@ -325,7 +309,6 @@ function getPacientesActuales22() {
   return base;
 }
 
-/* ===== Vista 2.2 (coincide con tus columnas de index.html) ===== */
 function renderPatientTable(){
   const tbody = document.getElementById("patients-tbody");
   if (!tbody) return;
@@ -397,14 +380,14 @@ function renderPatientTable(){
   });
 }
 
-/* ===== Modal (v2 → mapeado a confirm v2.2) ===== */
+/* ===== Modal ===== */
 function openConfirmationModal(patientId, action = "call") {
   currentAction = action;
   const pacientes = getPacientesActuales22();
   currentPatient = pacientes.find(p => p.id === patientId);
   if (!currentPatient) return;
 
-  // Detalle compacto (coincide con columnas actuales)
+  // coincide con columnas actuales
   const el = document.getElementById("patient-details");
   if (el) {
     const count = currentPatient.callCount || 0;
@@ -447,7 +430,7 @@ function confirmPatientCall22(){
     estado: "atendido",
     callCount: newCount,
     lastCalledAt: nowIso,
-    nombreCompleto: getNombrePaciente(prev)   // ✅ aseguramos nombre
+    nombreCompleto: getNombrePaciente(prev)   // ✅ asegura nombre
   };
 
 saveGlobalState(state);
@@ -532,7 +515,6 @@ function attachEventListeners() {
   });
 }
 
-/** Helpers de formato */
 function pad(n) { return n.toString().padStart(2, "0"); }
 function formatTime(iso) {
   try {
@@ -549,7 +531,6 @@ function formatDateTime(iso) {
   } catch { return ""; }
 }
 
-/* ===== Guard antidoble-incremento (fix sintaxis) ===== */
 let __cb25_processing = false;              // ✅ define variable
 function confirmPatientCallGuarded(fn){
   if (__cb25_processing) return;
@@ -562,7 +543,6 @@ if (typeof confirmPatientCall22 === "function") {
   window.confirmPatientCall = function(){ confirmPatientCallGuarded(confirmPatientCall22); };
 }
 
-/* === CallBox 2.7 — helpers === */
 function __cb27_normalizeEstado(s){
   if(!s) return "por atender";
   const k = (""+s).trim().toLowerCase();
@@ -574,7 +554,6 @@ function __cb27_getPacientes(){
   catch(e){ return []; }
 }
 
-/* === Utilidades modales === */
 function showModal(modal) {
   if (!modal) return;
   modal.classList.remove("hidden");

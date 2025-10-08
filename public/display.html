@@ -22,9 +22,53 @@
   .other-patient .name-left { font-size:20px; }
   .other-patient .box-right { font-size:20px; }
 
-  /* Pantalla completa */
-  #callOverlay { display:none; position:fixed; inset:0; z-index:9999; align-items:center; justify-content:center; background: rgba(0,0,0,0.25); }
-  #callOverlay .call-card { min-width: 40%; max-width: 900px; text-align:center; padding:30px; }
+
+  #callOverlay {
+    display: flex; /* siempre flex para centrar el .call-card */
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0.25);
+
+    visibility: hidden;
+    pointer-events: none;
+    opacity: 0;
+    will-change: transform, opacity;
+  }
+
+  #callOverlay .call-card {
+    min-width: 40%;
+    max-width: 900px;
+    text-align: center;
+    padding: 30px;
+    transform: translateX(0);
+  }
+
+  @keyframes slideInFromRight {
+    from { transform: translateX(30%); opacity: 0; }
+    to   { transform: translateX(0); opacity: 1; }
+  }
+  @keyframes slideOutToLeft {
+    from { transform: translateX(0); opacity: 1; }
+    to   { transform: translateX(-30%); opacity: 0; }
+  }
+
+  #callOverlay.show {
+    visibility: visible;
+    pointer-events: auto;
+    opacity: 1;
+  }
+
+  #callOverlay.show .call-card {
+    animation: slideInFromRight 450ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
+
+  #callOverlay.hiding .call-card {
+    animation: slideOutToLeft 350ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
+
   #overlayName { font-size:42px; font-weight:800; }
   #overlayBox { font-size:42px; font-weight:800; margin-top:8px; }
 </style>
@@ -41,8 +85,7 @@
     <div id="ad3" class="cell"></div>
   </div>
 
-  <!-- Fullscreen overlay shown on call (queued) -->
-  <div id="callOverlay">
+  <div id="callOverlay" aria-hidden="true">
     <div class="call-card">
       <div id="overlayName">Nombre A.</div>
       <div id="overlayBox">Box 5</div>
@@ -51,18 +94,17 @@
 
 <script>
 (function(){
-  const DISPLAY_MS = 4000; // using 4 seconds per your later spec (was 3s initially)
+  const DISPLAY_MS = 4000; // 4 segundos para cada llamado en pantalla completa
   const MAX_HISTORY = 5;
 
   const protocol = location.protocol === "https:" ? "wss:" : "ws:";
   const wsUrl = protocol + "//" + location.host; 
   
-  let ws; // usamos let para poder reconectar
+  let ws;
   let calls = [];
   const overlayQueue = [];
   let overlayBusy = false;
 
-  // audio sources: prefer mp3, fallback to wav if mp3 not available
   const AUDIO_MP3 = "sound/Call.mp3";
   const AUDIO_WAV = "sound/Call.wav";
 
@@ -95,8 +137,6 @@
     ws.onerror = (e) => { console.error("WS error", e); ws.close(); };
   }
 
-
-
   function handlePayload(payload){
     if (!payload) return;
     const paciente = payload.paciente || payload || {};
@@ -107,13 +147,11 @@
     const nameShort = formatShortName(nombreCompleto);
     const entry = { name: nameShort, box: boxNumber, at: payload.at || new Date().toISOString() };
 
-    // push to front and dedupe
     calls.unshift(entry);
     calls = calls.filter((v,i,self) => i === self.findIndex(t => t.name===v.name && t.box===v.box));
     if (calls.length > MAX_HISTORY) calls = calls.slice(0, MAX_HISTORY);
     renderHistory();
 
-    // enqueue overlay display (show fullscreen + sound)
     enqueueOverlay(entry);
   }
 
@@ -131,11 +169,18 @@
     const boxEl = document.getElementById("overlayBox");
     nameEl.textContent = entry.name || "";
     boxEl.textContent = entry.box ? ("Box " + entry.box) : "";
+    overlay.setAttribute('aria-hidden','false');
 
-    // show overlay
-    overlay.style.display = "flex";
+    if (overlay._hideTimer) { clearTimeout(overlay._hideTimer); overlay._hideTimer = null; }
 
-    // try mp3 then wav fallback
+    // muestra animacion en pantalla completa
+    overlay.classList.remove('hiding');
+    overlay.classList.add('show');
+
+    const card = overlay.querySelector('.call-card');
+    void card.offsetWidth;
+
+    // intenta forzar mp3, depende del navegador y su permiso
     const audio = new Audio();
     audio.src = AUDIO_MP3;
     audio.play().catch(()=>{
@@ -143,15 +188,24 @@
       audio.play().catch(()=>{});
     });
 
-    // after DISPLAY_MS hide and show next
-    setTimeout(()=>{
-      overlay.style.display = "none";
-      overlayBusy = false;
-      // next in queue
-      if (overlayQueue.length > 0) {
-        // small delay to avoid overlap
-        setTimeout(showNextOverlay, 200);
-      }
+    overlay._hideTimer = setTimeout(() => {
+      overlay.classList.add('hiding');
+
+      // esperamos la animacion
+      const onAnimEnd = (ev) => {
+        // filtra por el nombre de la animación de salida
+        if (ev && ev.animationName && ev.animationName.toLowerCase().includes('slideout')) {
+          card.removeEventListener('animationend', onAnimEnd);
+          overlay.classList.remove('show','hiding');
+          overlay.setAttribute('aria-hidden','true');
+          overlayBusy = false;
+          // si hay más en cola, ejecutar próximo luego de pequeña pausa
+          if (overlayQueue.length > 0) {
+            setTimeout(showNextOverlay, 200);
+          }
+        }
+      };
+      card.addEventListener('animationend', onAnimEnd);
     }, DISPLAY_MS);
   }
 
@@ -208,9 +262,9 @@
     });
   }
 
-  // initialize
+  // inicializar
   renderHistory();
-  connect();  // ahora sí existe
+  connect();
   window._callbox_display = { calls, enqueueOverlay, showNextOverlay };
 })();
 </script>

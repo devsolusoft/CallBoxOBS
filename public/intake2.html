@@ -54,10 +54,9 @@
 
 <footer class="foot"></footer>
 
-<!-- carga el intake.js existente para que el comportamiento de envío sea compatible -->
+<!-- carga el intake.js -->
 <script src="intake.js"></script>
 
-<!-- script de parsing y bridge: intenta reutilizar funciones del intake.js si existen; si no, usa eventos/postMessage/fetch -->
 <script>
 (function(){
   'use strict';
@@ -95,7 +94,6 @@
         }
       }
 
-      // Tipo de atención: intento heurístico entre hora y RUT
       let tipo = '';
       if (timeMatch && rutMatch && timeMatch.index!==undefined && rutMatch.index!==undefined) {
         const start = timeMatch.index + timeMatch[0].length;
@@ -117,7 +115,7 @@
         if (paren !== -1) nombre = after.slice(0, paren).trim();
         else nombre = after.replace(/\b\d+\b/g,'').trim();
       } else {
-        // fallback: secuencia de palabras en mayúsculas seguida de paréntesis
+
         const m = line.match(/([A-ZÁÉÍÓÚÑ\s]{3,})\s*\(/);
         if (m) nombre = m[1].trim();
       }
@@ -179,7 +177,7 @@
       if (typeof fn === 'function') {
         try {
           const result = fn(patients);
-          // si devuelve una Promise, la esperamos
+          // si devuelve una Promise, la espera
           if (result && typeof result.then === 'function') {
             try {
               const awaited = await result;
@@ -199,9 +197,9 @@
     }
 
     try {
-      // emitir CustomEvent (intake:patients)
+
       document.dispatchEvent(new CustomEvent('intake:patients', {detail:patients}));
-      // y postMessage al parent si aplica
+
       if (window.parent && window.parent !== window && window.parent.postMessage) {
         window.parent.postMessage({type:'intake:patients', patients}, '*');
       }
@@ -210,7 +208,7 @@
       console.error('customEvent failed', e);
     }
 
-    // último recurso: POST a /api/patients (puede o no existir en tu proyecto)
+    // último recurso: POST 
     try {
       const res = await fetch('/api/patients', {
         method: 'POST',
@@ -234,7 +232,7 @@
     return s;
   }
 
-  // eventos UI
+
   document.getElementById('btnPreview').addEventListener('click', ()=>{
     const raw = document.getElementById('raw').value;
     const fecha = document.getElementById('fecha').value;
@@ -251,7 +249,7 @@
     const s = document.getElementById('status'); if (s) s.textContent='';
   });
 
-  // función helper: muestra un popup modal simple y devuelve una Promise que se resuelve al cerrar
+  // función helper: muestra un popup modal simple 
   function showSuccessPopup(message, opts = {}) {
     return new Promise((resolve) => {
       const overlay = document.createElement('div');
@@ -293,7 +291,7 @@
       btn.style.borderRadius = '6px';
       btn.style.cursor = 'pointer';
       btn.style.fontSize = '14px';
-      // estilo visual neutral — no forzamos colores del proyecto
+
       btn.style.background = '#e6f7e6';
       btn.style.boxShadow = '0 2px 6px rgba(0,0,0,0.08)';
 
@@ -302,7 +300,7 @@
         resolve('ok');
       });
 
-      // cerrar al hacer click en overlay (fuera del card)
+      // cerrar al hacer click en overlay 
       overlay.addEventListener('click', (ev) => {
         if (ev.target === overlay) {
           document.body.removeChild(overlay);
@@ -316,7 +314,6 @@
       overlay.appendChild(card);
       document.body.appendChild(overlay);
 
-      // opcional: autocerrar después de X ms si opts.autoCloseMs está definido
       if (opts.autoCloseMs && typeof opts.autoCloseMs === 'number') {
         setTimeout(() => {
           if (document.body.contains(overlay)) {
@@ -325,8 +322,6 @@
           }
         }, opts.autoCloseMs);
       }
-
-      // poner foco en el botón por accesibilidad
       btn.focus();
     });
   }
@@ -341,17 +336,16 @@
       if (res && res.ok) {
         statusEl.textContent = 'Enviado correctamente (' + (res.method || '') + ')';
 
-        // mostramos popup y limpiamos al mismo tiempo
-        // ejecutamos la limpieza (simular click en btnClear) para reutilizar tu lógica existente
+        // limpiar
         const clearBtn = document.getElementById('btnClear');
         if (clearBtn) clearBtn.click();
 
-        // mostrar popup; lo dejamos hasta que el usuario cierre (o autoClose si prefieres)
+        // mostrar popup
         await showSuccessPopup('Pacientes enviados correctamente.', { autoCloseMs: 4000 });
 
       } else {
         statusEl.textContent = 'No fue posible enviar automáticamente. Método: ' + (res.method || 'N/A');
-        // ofrecer descarga JSON como fallback
+
         const blob = new Blob([JSON.stringify(patients,null,2)], {type:'application/json'});
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a'); a.href = url; a.download = 'patients.json'; a.textContent = 'Descargar JSON';
@@ -376,7 +370,6 @@
 <footer class="site-footer">
   <div class="footer-inner">
     <img src="Logo-con-Texto-Blanco.png" alt="Summate" class="footer-logo">
-    <div class="footer-copy"><small> Intake by Summate powered IA</small></div>
   </div>
 </footer>
 </body>

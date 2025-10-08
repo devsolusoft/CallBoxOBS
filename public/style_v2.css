@@ -66,7 +66,7 @@ body { margin:0; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto,
 .btn--secondary:hover { background: var(--color-secondary-hover); }
 .btn:disabled { opacity: .6; cursor: not-allowed; }
 
-.btn-call { composes: btn btn--primary; } /* note: purely visual; inlined classes in HTML */
+.btn-call { composes: btn btn--primary; } 
 
 .modal { position: fixed; inset:0; z-index: 1000; display:flex; align-items:center; justify-content:center; }
 .modal-backdrop { position:absolute; inset:0; background: rgba(0,0,0,.5); }
@@ -92,26 +92,20 @@ body { margin:0; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto,
 }
 
 
-/* Callbox 2.2: acciones a la derecha y en una sola línea */
 .patients-table td:last-child { white-space: nowrap; }
 .btn-actions { display: flex; gap: 8px; justify-content: flex-end; align-items: center; flex-wrap: nowrap; }
 .patients-table { table-layout: auto; }
 
-/* CallBox 2.3: icono eliminar */
 .btn .icon-trash { font-weight:bold; font-size:14px; }
 
-/* CallBox 2.4: ajustar columnas al contenido (nowrap), excepto 'Nombre' que puede envolver */
 .patients-table { table-layout: auto; }
 .patients-table th, .patients-table td { white-space: nowrap; }
 .patients-table td:first-child, .patients-table th:first-child { white-space: normal; }
-/* Botonera a la derecha, en una línea */
 .patients-table td:last-child { white-space: nowrap; }
 .btn-actions { display:flex; gap:8px; justify-content:flex-end; align-items:center; flex-wrap:nowrap; }
-/* Iconos en botones */
 .btn .icon { font-weight: bold; font-size: 14px; }
 
 
-/* Call Box 2.7 demo — footer sizing fix */
 .site-footer{ margin-top:32px; padding:16px 0 32px; display:flex; justify-content:center; }
 .footer-inner{ text-align:center; opacity:.85; }
 .footer-logo{ max-width:180px; height:auto; display:block; margin:0 auto 6px auto; }

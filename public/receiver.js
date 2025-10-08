@@ -1,4 +1,3 @@
-// receiver.js - listens to BroadcastChannel and WebSocket and renders incoming patients
 (function(){
   const container = document.getElementById('cards');
   const empty = document.getElementById('empty');
@@ -26,13 +25,11 @@
   }
 
   function pushPatient(p) {
-    // keep last MAX; newest first
     list.unshift(p);
     if (list.length > MAX) list = list.slice(0, MAX);
     render();
   }
 
-  // Listen BroadcastChannel
   if (typeof BroadcastChannel !== 'undefined') {
     try {
       const bc = new BroadcastChannel('callbox_channel');
@@ -44,7 +41,6 @@
     } catch(e){ console.warn('BroadcastChannel not available', e); }
   }
 
-  // Try WebSocket to server for remote events (if server exists)
   try {
     const ws = new WebSocket((location.protocol==='https:'?'wss:':'ws:') + '//' + location.host);
     ws.onmessage = (ev) => {
@@ -59,6 +55,5 @@
     ws.onerror = ()=>{/* ignore */};
   } catch(e){ /* ignore */ }
 
-  // expose for debugging
   window._callbox_receiver = { pushPatient };
 })();

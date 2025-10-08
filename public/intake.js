@@ -1,23 +1,15 @@
-// intake.js (versión extendida)
-// Mantiene el comportamiento del form original y exporta funciones globales:
-//   window.sendPatient(patient)    -> envía un solo paciente al endpoint
-//   window.sendPatients(patients)  -> envía un array de pacientes (secuencial por defecto)
-
 document.addEventListener("DOMContentLoaded", () => {
   const form = document.getElementById("intakeForm");
-  // intenta reusar o crear un div status
   let statusDiv = document.getElementById("status");
   if (!statusDiv) {
     statusDiv = document.createElement("div");
     statusDiv.id = "status";
-    // si hay un form, lo insertamos después; si no, lo pegamos al body
     if (form && form.parentNode) form.parentNode.insertBefore(statusDiv, form.nextSibling);
     else document.body.appendChild(statusDiv);
   }
 
   const clearBtn = document.getElementById("clearBtn");
 
-  // función interna que hace el POST a /api/pacientes
   async function postPatientToServer(payload) {
     const res = await fetch("/api/pacientes", {
       method: "POST",
@@ -38,7 +30,7 @@ document.addEventListener("DOMContentLoaded", () => {
     return body;
   }
 
-  // Función pública: enviar un único paciente (adapta nombres de campos)
+  // Función pública: enviar un único paciente 
   async function sendPatient(patient) {
     const payload = {
       nombreCompleto: patient.nombreCompleto || patient.nombre || "",
@@ -51,7 +43,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // Función pública: enviar varios pacientes
-  // options: { parallel: false, onProgress: function(index, statusObj) }
   async function sendPatients(patients, options = {}) {
     if (!Array.isArray(patients)) patients = [patients];
     const { parallel = false, onProgress } = options;
@@ -70,7 +61,7 @@ document.addEventListener("DOMContentLoaded", () => {
       return settled;
     }
 
-    // envía secuencial (más seguro para servidores simples)
+    // envía secuencial 
     for (let i = 0; i < patients.length; i++) {
       try {
         const r = await sendPatient(patients[i]);
@@ -86,11 +77,9 @@ document.addEventListener("DOMContentLoaded", () => {
     return results;
   }
 
-  // expose globally
   window.sendPatient = sendPatient;
   window.sendPatients = sendPatients;
 
-  // Mantenemos el comportamiento original del form (si existe)
   if (form) {
     form.addEventListener("submit", async (e) => {
       e.preventDefault();

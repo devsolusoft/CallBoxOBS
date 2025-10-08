@@ -41,7 +41,6 @@
     <div id="ad3" class="cell"></div>
   </div>
 
-  <!-- Fullscreen overlay shown on call (queued) -->
   <div id="callOverlay">
     <div class="call-card">
       <div id="overlayName">Nombre A.</div>
@@ -51,7 +50,7 @@
 
 <script>
 (function(){
-  const DISPLAY_MS = 4000; // using 4 seconds per your later spec (was 3s initially)
+  const DISPLAY_MS = 4000; // espera 4 seg
   const MAX_HISTORY = 5;
   const port = location.port || "3000";
   const protocol = location.protocol === "https:" ? "wss:" : "ws:";
@@ -61,7 +60,7 @@
   const overlayQueue = [];
   let overlayBusy = false;
 
-  // audio sources: prefer mp3, fallback to wav if mp3 not available
+  // carga y uso del audio 
   const AUDIO_MP3 = "sound/Call.mp3";
   const AUDIO_WAV = "sound/Call.wav";
 
@@ -83,11 +82,10 @@
           if (msg.type === "PATIENT_CALL" && msg.data) {
             handlePayload(msg.data);
           } else {
-            // ignore other message types like HELLO
+
             return;
           }
         } else {
-          // raw payload
           handlePayload(msg);
         }
       } catch(e) {
@@ -108,13 +106,12 @@
     const nameShort = formatShortName(nombreCompleto);
     const entry = { name: nameShort, box: boxNumber, at: payload.at || new Date().toISOString() };
 
-    // push to front and dedupe
+
     calls.unshift(entry);
     calls = calls.filter((v,i,self) => i === self.findIndex(t => t.name===v.name && t.box===v.box));
     if (calls.length > MAX_HISTORY) calls = calls.slice(0, MAX_HISTORY);
     renderHistory();
 
-    // enqueue overlay display (show fullscreen + sound)
     enqueueOverlay(entry);
   }
 
@@ -133,10 +130,8 @@
     nameEl.textContent = entry.name || "";
     boxEl.textContent = entry.box ? ("Box " + entry.box) : "";
 
-    // show overlay
     overlay.style.display = "flex";
 
-    // try mp3 then wav fallback
     const audio = new Audio();
     audio.src = AUDIO_MP3;
     audio.play().catch(()=>{
@@ -144,13 +139,10 @@
       audio.play().catch(()=>{});
     });
 
-    // after DISPLAY_MS hide and show next
     setTimeout(()=>{
       overlay.style.display = "none";
       overlayBusy = false;
-      // next in queue
       if (overlayQueue.length > 0) {
-        // small delay to avoid overlap
         setTimeout(showNextOverlay, 200);
       }
     }, DISPLAY_MS);
@@ -209,7 +201,7 @@
     });
   }
 
-  // initialize
+  // inicializar
   renderHistory();
   connect();
   window._callbox_display = { calls, enqueueOverlay, showNextOverlay };
