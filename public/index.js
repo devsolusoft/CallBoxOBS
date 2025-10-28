@@ -410,55 +410,67 @@ function openConfirmationModal(patientId, action = "call") {
 
   showModal(document.getElementById("confirmation-modal"));
 }
-
 let __cb28_processing = false;
 function confirmPatientCall22(){
   if(__cb28_processing) return;             // ✅ guard único
   __cb28_processing = true;
 
-  if (!currentPatient || !currentBox) return;
+  if (!currentPatient || !currentBox) {
+    __cb28_processing = false;
+    return;
+  }
   const state = getPacientesActuales22();
   const idx = state.findIndex(p => p.id === currentPatient.id);
-  if (idx === -1) return;
+  if (idx === -1) {
+    __cb28_processing = false;
+    return;
+  }
 
   const nowIso = new Date().toISOString();
   const prev = state[idx];
   const newCount = (prev.callCount || 0) + 1;
+
+  // Añadimos información del box desde donde se llamó
+  const boxInfo = { id: currentBox.id, nombre: currentBox.nombre || currentBox.name || (`Box ${currentBox.id}`) };
 
   state[idx] = {
     ...prev,
     estado: "atendido",
     callCount: newCount,
     lastCalledAt: nowIso,
-    nombreCompleto: getNombrePaciente(prev)   // ✅ asegura nombre
+    nombreCompleto: getNombrePaciente(prev),   // ✅ asegura nombre
+    // campos nuevos:
+    lastCalledBox: boxInfo,    // usado internamente para mostrar en la tabla
+    boxId: boxInfo.id,
+    box: boxInfo
   };
 
-saveGlobalState(state);
-if(channel) channel.postMessage({ type: "STATE_UPDATED_GLOBAL" });
+  // Guardar estado con la info del box incluida
+  saveGlobalState(state);
+  if(channel) channel.postMessage({ type: "STATE_UPDATED_GLOBAL" });
 
   // Enviar evento al servidor para que displays remotos (OBS) actualicen la tarjeta
-try {
-  const payload = {
-    boxId: (currentBox && (currentBox.id || currentBox.name)) ? (currentBox.id || currentBox.name) : "box",
-    paciente: state[idx],
-    action: currentAction || "call",
-    at: (new Date()).toISOString()
-  };
+  try {
+    // Enviamos el objeto del paciente (que ahora tiene .box y .boxId)
+    fetch("/api/llamar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(state[idx])
+    }).catch(err => console.error("Error al llamar paciente:", err));
 
-  // 🔔 notificar a display vía servidor
-  fetch("/api/llamar", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload.paciente)
-  }).catch(err => console.error("Error al llamar paciente:", err));
+    // También enviamos payload para logs/compatibilidad
+    const payload = {
+      boxId: boxInfo.id,
+      box: boxInfo,
+      paciente: state[idx],
+      action: currentAction || "call",
+      at: (new Date()).toISOString()
+    };
+    pushToServer(payload);
 
-  // 🔄 mantener compatibilidad con la función pushToServer (logs, depuración)
-  pushToServer(payload);
-
-} catch (e) {
-  console.warn("pushToServer failed:", e);
-}
-
+  } catch (e) {
+    console.warn("pushToServer failed:", e);
+  }
 
   if (channel) channel.postMessage({ type: "STATE_UPDATED", boxId: currentBox.id });
 

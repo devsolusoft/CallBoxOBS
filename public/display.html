@@ -22,9 +22,8 @@
   .other-patient .name-left { font-size:20px; }
   .other-patient .box-right { font-size:20px; }
 
-
   #callOverlay {
-    display: flex; /* siempre flex para centrar el .call-card */
+    display: flex;
     position: fixed;
     inset: 0;
     z-index: 9999;
@@ -94,7 +93,7 @@
 
 <script>
 (function(){
-  const DISPLAY_MS = 4000; // 4 segundos para cada llamado en pantalla completa
+  const DISPLAY_MS = 4000; // duración del overlay
   const MAX_HISTORY = 5;
 
   const protocol = location.protocol === "https:" ? "wss:" : "ws:";
@@ -140,13 +139,23 @@
   function handlePayload(payload){
     if (!payload) return;
     const paciente = payload.paciente || payload || {};
-    const nombreCompleto = paciente.nombreCompleto || paciente.nombre || paciente.name || "";
-    const boxRaw = payload.boxId || payload.box || payload.boxIdRaw || "";
-    const boxNumber = extractBoxNumber(boxRaw);
 
+    const nombreCompleto = paciente.nombreCompleto || paciente.nombre || paciente.name || "";
+    
+    // 🩵 Mejor detección de Box (más robusta)
+    const boxRaw = 
+      payload.box?.nombre || 
+      paciente.box?.nombre || 
+      payload.boxId || 
+      payload.box || 
+      paciente.box || 
+      "";
+
+    const boxNumber = extractBoxNumber(boxRaw);
     const nameShort = formatShortName(nombreCompleto);
     const entry = { name: nameShort, box: boxNumber, at: payload.at || new Date().toISOString() };
 
+    // evita duplicados
     calls.unshift(entry);
     calls = calls.filter((v,i,self) => i === self.findIndex(t => t.name===v.name && t.box===v.box));
     if (calls.length > MAX_HISTORY) calls = calls.slice(0, MAX_HISTORY);
@@ -173,14 +182,12 @@
 
     if (overlay._hideTimer) { clearTimeout(overlay._hideTimer); overlay._hideTimer = null; }
 
-    // muestra animacion en pantalla completa
     overlay.classList.remove('hiding');
     overlay.classList.add('show');
 
     const card = overlay.querySelector('.call-card');
     void card.offsetWidth;
 
-    // intenta forzar mp3, depende del navegador y su permiso
     const audio = new Audio();
     audio.src = AUDIO_MP3;
     audio.play().catch(()=>{
@@ -191,15 +198,12 @@
     overlay._hideTimer = setTimeout(() => {
       overlay.classList.add('hiding');
 
-      // esperamos la animacion
       const onAnimEnd = (ev) => {
-        // filtra por el nombre de la animación de salida
         if (ev && ev.animationName && ev.animationName.toLowerCase().includes('slideout')) {
           card.removeEventListener('animationend', onAnimEnd);
           overlay.classList.remove('show','hiding');
           overlay.setAttribute('aria-hidden','true');
           overlayBusy = false;
-          // si hay más en cola, ejecutar próximo luego de pequeña pausa
           if (overlayQueue.length > 0) {
             setTimeout(showNextOverlay, 200);
           }
@@ -212,7 +216,7 @@
   function extractBoxNumber(boxId){
     if (!boxId) return "";
     const m = String(boxId).match(/(\d+)/);
-    return m ? m[0] : String(boxId);
+    return m ? m[0] : String(boxId).trim();
   }
 
   function formatShortName(fullName){
@@ -262,7 +266,6 @@
     });
   }
 
-  // inicializar
   renderHistory();
   connect();
   window._callbox_display = { calls, enqueueOverlay, showNextOverlay };

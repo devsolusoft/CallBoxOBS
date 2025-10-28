@@ -7,6 +7,8 @@ const path = require("path");
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
+globalThis.__wssClients = new Set();
+
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public"))); // <-- tu carpeta con index.html, display.html, etc.
@@ -15,12 +17,18 @@ let pacientes = [];
 let pacienteActivo = null;
 
 function broadcast(msg) {
+  const str = typeof msg === "string" ? msg : JSON.stringify(msg);
   wss.clients.forEach((client) => {
     if (client.readyState === WebSocket.OPEN) {
-      client.send(msg);
+      try {
+        client.send(str);
+      } catch (e) {
+        console.warn("Error enviando mensaje WS:", e.message);
+      }
     }
   });
 }
+
 
 /* === Rutas REST === */
 
@@ -75,9 +83,19 @@ app.post("/api/llamar", (req, res) => {
 
 /* === WebSockets === */
 wss.on("connection", (ws) => {
-  console.log("Nuevo cliente conectado");
-  ws.send(JSON.stringify({ type: "HELLO", pacientes }));
+  console.log("🟢 Nuevo cliente WebSocket conectado");
+  globalThis.__wssClients.add(ws);
+
+  // Envía lista inicial de pacientes
+  ws.send(JSON.stringify({ type: "HELLO", data: pacientes }));
+
+  // Limpia al desconectarse
+  ws.on("close", () => {
+    globalThis.__wssClients.delete(ws);
+    console.log("🔴 Cliente WebSocket desconectado");
+  });
 });
+
 
 /* === Start server === */
 const PORT = process.env.PORT || 3000;
