@@ -52,11 +52,26 @@ app.post("/api/pacientes", (req, res) => {
 });
 
 // limpiar pacientes
-app.delete("/api/pacientes", (req, res) => {
-  pacientes = [];
-  broadcast(JSON.stringify({ type: "PACIENTES_CLEARED" }));
-  res.json({ ok: true });
+app.delete("/api/pacientes/:id", (req, res) => {
+  const { id } = req.params;
+  const idNum = Number(id);
+
+  // Filtrar el paciente fuera de la lista
+  const before = pacientes.length;
+  pacientes = pacientes.filter(p => p.id !== idNum);
+
+  console.log(`🗑️ Paciente eliminado: ${id}`);
+
+  // Notificar a todos los clientes conectados que se eliminó un paciente
+  broadcast(JSON.stringify({
+    type: "PATIENT_DELETED",
+    data: { id: idNum }
+  }));
+
+  res.json({ ok: true, removed: before - pacientes.length });
 });
+
+
 
 // 🔔 llamar paciente
 app.post("/api/llamar", (req, res) => {

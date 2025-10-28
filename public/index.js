@@ -18,7 +18,7 @@ function pushToServer(payload) {
 const boxes = [
   { id: 1, nombre: "Box 1" },   { id: 2, nombre: "Box 2" },   { id: 3, nombre: "Box 3" },   { id: 4, nombre: "Box 4" },   { id: 5, nombre: "Box 5" },   { id: 6, nombre: "Box 6" },   { id: 7, nombre: "Box 7" },   { id: 8, nombre: "Box 8" },   { id: 9, nombre: "Box 9" },   { id: 10, nombre: "Box 10" },   { id: 11, nombre: "Box 11" }
 ];
-
+/*
 const pacientesBase = [
   { id: 1, nombreCompleto: "María Elena González Ruiz", rut: "15.234.567-8", horaCita: "09:00", estado: "Listo", tipoAtencion: "Consulta General", sexo: "Femenino", edad: 45 },
   { id: 2, nombreCompleto: "Carlos Alberto Mendoza Silva", rut: "12.876.543-2", horaCita: "09:30", estado: "No Listo", tipoAtencion: "Control Presión", sexo: "Masculino", edad: 67 },
@@ -30,7 +30,7 @@ const pacientesBase = [
   { id: 8, nombreCompleto: "Javier Antonio Rojas Fernández", rut: "13.678.901-5", horaCita: "12:30", estado: "Listo", tipoAtencion: "Control Post-Operatorio", sexo: "Masculino", edad: 48 },
   { id: 9, nombreCompleto: "Isabel Cristina Vargas Soto", rut: "19.123.456-0", horaCita: "13:00", estado: "No Listo", tipoAtencion: "Consulta Cardiológica", sexo: "Femenino", edad: 72 },
   { id: 10, nombreCompleto: "Manuel Ignacio Contreras Ramírez", rut: "10.987.654-6", horaCita: "13:30", estado: "Listo", tipoAtencion: "Control Hipertensión", sexo: "Masculino", edad: 58 }
-];
+];*/
 
 /* WebSocket + polling) */
 let __serverPacientes = null;
@@ -54,6 +54,25 @@ function initServerWebSocket() {
     ws.onopen = () => { console.log('WS connected (server sync)'); syncServerPacientes(); };
     ws.onmessage = (ev) => {
       try {
+        if (msg && msg.type === "PATIENT_DELETED" && msg.data?.id) {
+  // Eliminar del cache local __serverPacientes
+        if (Array.isArray(__serverPacientes)) {
+          __serverPacientes = __serverPacientes.filter(p => p.id !== msg.data.id);
+        }
+
+        // También eliminar del almacenamiento global localStorage
+        const stored = loadGlobalState();
+        if (stored?.pacientes) {
+          stored.pacientes = stored.pacientes.filter(p => p.id !== msg.data.id);
+          saveGlobalState(stored.pacientes);
+        }
+
+        // Volver a renderizar la tabla
+        try { renderPatientTable(); } catch(e) {}
+
+        console.log(`🗑️ Paciente ${msg.data.id} eliminado (sincronizado vía WS)`);
+      }
+
         const msg = JSON.parse(ev.data);
         if (msg && msg.type === 'NEW_PATIENT') {
           syncServerPacientes();
@@ -354,15 +373,32 @@ function renderPatientTable(){
     btnDelete.className = "btn";
     btnDelete.innerHTML = `<span class="icon-trash">🗑</span> Eliminar`;
     btnDelete.title = "Quitar este paciente de la lista";
-    btnDelete.addEventListener("click", (e)=>{
+    btnDelete.addEventListener("click", (e) => {
       e.preventDefault();
-      if (confirm("¿Eliminar paciente de la lista?")) {
-        const list = getPacientesActuales22().filter(p => p.id !== paciente.id);
-        saveState(currentBox.id, list);
-        if (channel) channel.postMessage({ type: "STATE_UPDATED", boxId: currentBox.id });
+      if (confirm(`¿Eliminar completamente a ${getNombrePaciente(paciente)} de la lista de pacientes?`)) {
+        // 1️⃣ Obtener la lista global de pacientes
+        let pacientes = getPacientesActuales22();
+
+        // 2️⃣ Filtrar al paciente fuera de la lista
+        pacientes = pacientes.filter(p => p.id !== paciente.id);
+
+        // 3️⃣ Guardar el nuevo estado global sin el paciente
+        saveGlobalState(pacientes);
+
+        // 4️⃣ Notificar a otras pestañas (sincronización)
+        if (channel) channel.postMessage({ type: "STATE_UPDATED_GLOBAL" });
+
+        // 5️⃣ Actualizar la tabla en pantalla
         renderPatientTable();
+
+        // 6️⃣ Opcional: enviar al servidor (para registro o display)
+        fetch(`/api/pacientes/${paciente.id}`, { method: "DELETE" })
+        .then(() => syncServerPacientes())
+        .catch(() => {});
+
       }
     });
+
     actions.appendChild(btnDelete);
 
     tr.innerHTML = `
